@@ -1,101 +1,92 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"sort"
-	"strconv"
-	"strings"
 )
 
+var exchangeRates = map[string]map[string]float64{
+	"USD": {
+		"EUR": 0.88,
+		"RUB": 81.15,
+		"USD": 1,
+	},
+	"EUR": {
+		"USD": 1 / 0.88,
+		"RUB": 81.15 / 0.88,
+		"EUR": 1,
+	},
+	"RUB": {
+		"USD": 1 / 81.15,
+		"EUR": 0.88 / 81.15,
+		"RUB": 1,
+	},
+}
+
 func main() {
-	operator := input()
-	inputStr := inputNumbers()
-
-	numbers := []int{} // Empty slice
-
-	// Clean the input by removing all whitespace first
-	cleanedInput := strings.ReplaceAll(inputStr, " ", "")
-	// Then split by commas if any
-	numStrings := strings.Split(cleanedInput, ",")
-
-	for _, numStr := range numStrings {
-		if numStr == "" {
-			continue
-		}
-		num, err := strconv.Atoi(numStr)
+	for {
+		amount, err := UserInput()
 		if err != nil {
-			fmt.Printf("Error converting %v: %v\n", numStr, err)
+			fmt.Print(err)
 			continue
 		}
-		numbers = append(numbers, num)
-	}
+		fmt.Printf("The amount is: %v\n", amount)
 
-	if len(numbers) == 0 {
-		fmt.Println("No valid numbers provided")
-		return
-	}
+		originalCurrency, targetCurrency, err := UserInputCurrency()
+		if err != nil {
+			fmt.Print(err)
+			continue
+		}
 
-	var result interface{}
-	switch strings.ToUpper(operator) {
-	case "AVG":
-		result = average(numbers)
-	case "SUM":
-		result = sum(numbers)
-	case "MED":
-		result = median(numbers)
-	default:
-		fmt.Println("Invalid operator. Please choose AVG, SUM, or MED")
-		return
-	}
+		fmt.Printf("Conversion amount of %v from %s to %s is: ", amount, originalCurrency, targetCurrency)
 
-	fmt.Printf("Here is the final answer of the %s operation on %v:\n", operator, numbers)
-	fmt.Println(result)
+		rate, ok := exchangeRates[originalCurrency][targetCurrency]
+		if !ok {
+			fmt.Printf("unsupported currency pair: %s to %s\n", originalCurrency, targetCurrency)
+			continue
+		}
+
+		fmt.Println(amount * rate)
+	}
 }
 
-func input() string {
-	var reply string
-	text := "Choose one of the following operations: AVG, SUM, MED"
-	fmt.Println(text)
-	fmt.Scan(&reply)
-	return reply
-}
-
-func inputNumbers() string {
-	var reply string
-	text := "Input the numbers to which you want to perform the statistical operation on (separated by commas):"
-	fmt.Println(text)
-	fmt.Scanln(&reply) // Use Scanln to handle potential spaces
-	return reply
-}
-
-func sum(numbers []int) int {
-	total := 0
-	for _, num := range numbers {
-		total += num
-	}
-	return total
-}
-
-func average(numbers []int) float64 {
-	if len(numbers) == 0 {
-		return 0
-	}
-	return float64(sum(numbers)) / float64(len(numbers))
-}
-
-func median(numbers []int) float64 {
-	if len(numbers) == 0 {
-		return 0
+func UserInput() (float64, error) {
+	var amount float64
+	fmt.Println("Please enter the amount:")
+	_, err := fmt.Scan(&amount)
+	if err != nil {
+		return 0, errors.New("invalid input")
 	}
 
-	nums := make([]int, len(numbers))
-	copy(nums, numbers)
-
-	sort.Ints(nums)
-
-	n := len(nums)
-	if n%2 == 1 {
-		return float64(nums[n/2])
+	if amount <= 0 {
+		return 0, errors.New("enter a value above 0\n")
 	}
-	return float64(nums[n/2-1]+nums[n/2]) / 2.0
+	return amount, nil
+}
+
+func UserInputCurrency() (string, string, error) {
+	var originalCurrency, targetCurrency string
+
+	fmt.Println("Please choose original currency from EUR, RUB, USD:")
+	_, err := fmt.Scan(&originalCurrency)
+	if err != nil {
+		return "", "", errors.New("invalid input")
+	}
+
+	fmt.Println("Please choose the target currency from EUR, RUB, USD:")
+	_, err = fmt.Scan(&targetCurrency)
+	if err != nil {
+		return "", "", errors.New("invalid input")
+	}
+
+	if !isValidCurrency(originalCurrency) || !isValidCurrency(targetCurrency) {
+		return "", "", errors.New("please enter either EUR, USD or RUB\n")
+	}
+
+	return originalCurrency, targetCurrency, nil
+}
+
+func isValidCurrency(currency string) bool {
+	_, exists := exchangeRates[currency]
+	return exists
 }
